@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "cppdbg",
+      "request": "launch",
+      "args": [],
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "cwd": "/home/yonn_drakkonuer/project/Juiz/696efe4fabce59d82c0b82939a640aa4437f66f5e60594b919c6ad0964990d5d25dc596ea1a04f0bb5979d28c24cb6966fa6a295456e2ad9a6201535e8563e9b",
+      "program": "/home/yonn_drakkonuer/project/Juiz/696efe4fabce59d82c0b82939a640aa4437f66f5e60594b919c6ad0964990d5d25dc596ea1a04f0bb5979d28c24cb6966fa6a295456e2ad9a6201535e8563e9b/build/Debug/outDebug",
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}

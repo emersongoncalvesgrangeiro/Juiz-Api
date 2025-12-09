@@ -3,8 +3,8 @@ using Archives;
 using CodeAnalysis;
 using CompilationSystem;
 using dotenv.net;
-DotEnv.Load();
 
+DotEnv.Load();
 string key = Environment.GetEnvironmentVariable("Gemini");
 
 ArchiveManager manager = new ArchiveManager();
@@ -32,6 +32,11 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   if (codeAnalyzer.warnings > 6 || codeAnalyzer.errors > 3 || sum >= 1000) {
     manager.DeleteDirectory(HashOutput);
   } else {
+    List<string> list = new List<string>();
+    foreach (string d in data.Files) {
+      list.Add(d);
+    }
+    compilation.Add_(list);
     await compilation.Checker(HashOutput + "/" + manager.ID_Code + "/");
     Console.WriteLine("Erros: " + compilation.error);
     Console.WriteLine("Output: " + compilation.output);

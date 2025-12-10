@@ -10,6 +10,7 @@ namespace CompilationSystem {
     public void Add_(List<string> a) {
       foreach (string b in a) {
         list.Add(b);
+        Console.WriteLine(b);
       }
     }
     public async Task Checker(string path) {
@@ -28,19 +29,11 @@ namespace CompilationSystem {
         default:
           break;
       }
-      await Compiler(archives, path, compilationinfo);
+      await Compiler(path, compilationinfo);
     }
-    public async Task Compiler(string[] archives, string path, string type) {
+    public async Task Compiler(string path, string type) {
       var process = new ProcessStartInfo();
       string archivelist = "";
-      int v = 0;
-      foreach (string archive in list) {
-        v++;
-        if (v > 1) {
-          archivelist += " ";
-        }
-        archivelist += archive;
-      }
       process.FileName = "/bin/bash";
       process.RedirectStandardOutput = true;
       process.RedirectStandardError = true;
@@ -50,12 +43,13 @@ namespace CompilationSystem {
         if (type == "java") {
           process.Arguments = $"-c \"cd '{path}'/ && javac *.java -d out";
         } else if (type == "c") {
-          process.Arguments = $"-c \"cd '{path}'/ && gcc '{archivelist}' -o out";
+          archivelist = string.Join(" ", list.Select(x => $"'{x}'"));
+          process.Arguments = $"-c \"cd '{path}'/ && gcc *.c *.h -o out";
         }
         using var processstart = Process.Start(process);
+        await processstart.WaitForExitAsync();
         output = processstart.StandardOutput.ReadToEnd();
         error = processstart.StandardError.ReadToEnd();
-        await processstart.WaitForExitAsync();
       } catch (Exception e) {
         Console.WriteLine($"Error: ${e.Message}");
       }

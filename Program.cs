@@ -36,7 +36,6 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
     foreach (string d in data.Files) {
       list.Add(d);
     }
-    compilation.Add_(list);
     await compilation.Checker(HashOutput + "/" + manager.ID_Code + "/");
     Console.WriteLine("Erros: " + compilation.error);
     Console.WriteLine("Output: " + compilation.output);

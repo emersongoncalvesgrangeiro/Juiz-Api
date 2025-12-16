@@ -3,7 +3,7 @@ using System.IO;
 
 namespace Archives {
   public class ArchiveManager {
-    public int ID_Code;
+    public short ID_Code;
     public List<string> list = new List<string>();
     public async Task MakeArchives(string HashOutput, List<IFormFile> files) {
       try {

@@ -2,6 +2,7 @@ using HashSystem;
 using Archives;
 using CodeAnalysis;
 using CompilationSystem;
+using DockerSystem;
 using dotenv.net;
 
 DotEnv.Load();
@@ -10,6 +11,7 @@ string key = Environment.GetEnvironmentVariable("Gemini");
 ArchiveManager manager = new ArchiveManager();
 CodeAnalyzer codeAnalyzer;
 CompilationSystem_ compilation;
+DockerManager dockerManager;
 
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
@@ -17,6 +19,7 @@ var app = builder.Build();
 app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   compilation = new CompilationSystem_();
   codeAnalyzer = new CodeAnalyzer(key);
+  dockerManager = new DockerManager();
   var from = await request.ReadFormAsync();
   var data = new { Files = from.Files.Select(f => f.FileName).ToList() };
   var files = from.Files.ToList();
@@ -27,19 +30,19 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   foreach (string code in manager.list) {
     codeforanalyze += code + "\n";
   }
-  await codeAnalyzer.AnalyzeCode(codeforanalyze);
+  //await codeAnalyzer.AnalyzeCode(codeforanalyze);
   int sum = (codeAnalyzer.errors * 250) + (codeAnalyzer.warnings * 150);
-  if (codeAnalyzer.warnings > 6 || codeAnalyzer.errors > 3 || sum >= 1000) {
+  if (/*codeAnalyzer.warnings > 6 || codeAnalyzer.errors > 3 || sum >= 1000*/false) {
     manager.DeleteDirectory(HashOutput);
   } else {
-    List<string> list = new List<string>();
-    foreach (string d in data.Files) {
-      list.Add(d);
-    }
     await compilation.Checker(HashOutput + "/" + manager.ID_Code + "/");
     Console.WriteLine("Erros: " + compilation.error);
     Console.WriteLine("Output: " + compilation.output);
   }
+  await dockerManager.DockerFileMaker(HashOutput + "/" + manager.ID_Code + "/", compilation.TYPE);
+  await dockerManager.DockerBuildImage(HashOutput + "/" + manager.ID_Code + "/");
+  await dockerManager.RunContainer();
+  await dockerManager.Reader();
   return Results.Ok(data);
 }).DisableAntiforgery().WithName("/");
 

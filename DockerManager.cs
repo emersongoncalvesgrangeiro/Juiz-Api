@@ -47,14 +47,27 @@ namespace DockerSystem {
       };
       resp?.Dispose();
       resp = await client.Images.BuildImageFromDockerfileAsync(ts, dockerparams);
-      CID_ = Tags;
-    }
-    public async Task Reader() {
       using var reader = new StreamReader(resp);
-      while (!reader.EndOfStream) {
-        Console.WriteLine(await reader.ReadLineAsync());
+      string? line;
+      bool success = true;
+      while ((line = await reader.ReadLineAsync()) != null) {
+        Console.WriteLine(line);
+        if (line.Contains("error", StringComparison.OrdinalIgnoreCase)) {
+          success = false;
+        }
+      }
+      if (success) {
+        CID_ = Tags;
+      } else {
+        throw new Exception("Error");
       }
     }
+    /* public async Task Reader() {
+       using var reader = new StreamReader(resp);
+       while (!reader.EndOfStream) {
+         Console.WriteLine(await reader.ReadLineAsync());
+       }
+     }*/
     private async Task<Stream> TarMaker(string directory) {
       var memorystream = new MemoryStream();
       var tarout = new TarOutputStream(memorystream, Encoding.UTF8);
@@ -82,7 +95,7 @@ namespace DockerSystem {
         throw new Exception("Erro ao iniciar container");
       }
       await client.Containers.WaitContainerAsync(containerid);
-      //await ContainerKill(containerid);
+      await ContainerKill(containerid);
       return containerid;
     }
     public async Task ContainerKill(string ID) {

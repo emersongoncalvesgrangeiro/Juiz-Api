@@ -42,7 +42,6 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   await dockerManager.DockerFileMaker(HashOutput + "/" + manager.ID_Code + "/", compilation.TYPE);
   await dockerManager.DockerBuildImage(HashOutput + "/" + manager.ID_Code + "/");
   await dockerManager.RunContainer();
-  await dockerManager.Reader();
   return Results.Ok(data);
 }).DisableAntiforgery().WithName("/");
 

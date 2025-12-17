@@ -39,7 +39,7 @@ namespace DockerSystem {
       string Tags = "";
       using var ts = await TarMaker(path);
       var CID = Guid.NewGuid().ToString("N");
-      Tags = $"{CID}:latest";
+      Tags = $"run-{CID}:latest";
       var dockerparams = new ImageBuildParameters {
         Dockerfile = "Dockerfile",
         Tags = new List<string> { Tags },
@@ -73,21 +73,19 @@ namespace DockerSystem {
       return memorystream;
     }
     public async Task<string> RunContainer() {
-      string Contanierimagename = "";
-      Contanierimagename = $"{CID_}:latest";
       var container = await client.Containers.CreateContainerAsync(new CreateContainerParameters {
-        Image = Contanierimagename,
+        Image = CID_
       });
-      bool containerrunning = await client.Containers.StartContainerAsync(container.ID, null);
       var containerid = container.ID;
+      bool containerrunning = await client.Containers.StartContainerAsync(containerid, null);
       if (!containerrunning) {
         throw new Exception("Erro ao iniciar container");
       }
       await client.Containers.WaitContainerAsync(containerid);
-      await ContainerKill(containerid);
+      //await ContainerKill(containerid);
       return containerid;
     }
-    public async Task ContainerKill(/*List<string> containers*/string ID) {
+    public async Task ContainerKill(string ID) {
       await client.Containers.StopContainerAsync(ID, new ContainerStopParameters { WaitBeforeKillSeconds = 0 });
       await client.Containers.RemoveContainerAsync(ID, new ContainerRemoveParameters { Force = true });
       await client.Images.DeleteImageAsync(CID_, new ImageDeleteParameters { Force = true });

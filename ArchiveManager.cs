@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-
 namespace Archives {
   public class ArchiveManager {
     public short ID_Code;

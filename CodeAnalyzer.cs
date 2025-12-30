@@ -1,5 +1,4 @@
 using Google.GenAI;
-using Google.GenAI.Types;
 using System.Text.RegularExpressions;
 
 namespace CodeAnalysis {

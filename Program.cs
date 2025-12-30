@@ -55,7 +55,8 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
     codeforanalyze += code + "\n";
   }
   await codeAnalyzer.AnalyzeCode(codeforanalyze);
-  await compilation.Checker(HashOutput + "/" + manager.ID_Code + "/");
+  string finalpath = Path.Combine(HashOutput, manager.ID_Code.ToString());
+  await compilation.Checker(finalpath);
   int sum = (codeAnalyzer.errors * 250) + (codeAnalyzer.warnings * 150);
   if (codeAnalyzer.warnings > 6 || codeAnalyzer.errors > 3 || sum >= 1000) {
     manager.DeleteDirectory(HashOutput);
@@ -66,7 +67,6 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   if (dockerManager.sucess) {
     ID = await dockerManager.RunContainer();
   }
-  //Console.WriteLine("\n\t\tIA:" + "\n\t\tError:" + codeAnalyzer.errors + "\n\t\tWarnings:" + codeAnalyzer.warnings + "\n\t\tCompilarion:" + "\n\t\tError:" + compilation.error + "\n\t\toutput:" + compilation.warnings + "\n\t\tDocker:" + "\n\t\tError:" + dockerManager.errors + "\n\t\tWarnings:" + dockerManager.warnings + "\n");
   var (approved, finalscore) = avaliator.Calculating(codeAnalyzer.errors, codeAnalyzer.warnings, compilation.error, compilation.warnings, dockerManager.errors, dockerManager.warnings);
   await dbConnector.Connect(Name, Team, HashOutput, manager.ID_Code, finalscore, approved);
   if (dockerManager.sucess && !dockerManager.timeout__) {
@@ -79,6 +79,5 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   }
   return Results.Ok(data);
 }).DisableAntiforgery().WithName("/");
-
 
 app.Run();

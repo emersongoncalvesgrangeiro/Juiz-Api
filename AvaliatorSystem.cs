@@ -1,5 +1,3 @@
-using System;
-
 namespace AvaliatorSystem {
   public class Avaliator {
     public KeyValuePair<bool, int> Calculating(int errorsIA, int warningsIA, int errorscompilation, int warningscompilation, int errorrunning, int warningsrunning) {

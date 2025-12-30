@@ -17,6 +17,10 @@ namespace DockerSystem {
     private DateTime lastoutput;
     private string response = "";
     private bool sendresponse = false;
+    public int warnings = 0;
+    public int errors = 0;
+    public bool timeout__ = false;
+    public bool sucess = true;
     public DockerManager(string key) {
       client = new DockerClientConfiguration(new Uri("unix:///var/run/docker.sock")).CreateClient();
       CID_ = "";
@@ -24,6 +28,22 @@ namespace DockerSystem {
       sb = new StringBuilder();
       codeAnalyzer = new CodeAnalyzer(key);
     }
+    private static readonly string[] ErrorKeywords =
+    {
+        "error",
+        "exception",
+        "segmentation fault",
+        "abort",
+        "fatal"
+    };
+
+    private static readonly string[] WarningKeywords =
+    {
+      "warning",
+      "deprecated",
+      "unchecked"
+    };
+
     public async Task DockerFileMaker(string path, string type) {
       string DockerFilec =
       "FROM ubuntu:latest AS build\n" +
@@ -47,29 +67,33 @@ namespace DockerSystem {
       }
     }
     public async Task DockerBuildImage(string path) {
-      using var ts = await TarMaker(path);
-      var CID = Guid.NewGuid().ToString("N");
-      string Tags = $"run-{CID}:latest";
-      var dockerparams = new ImageBuildParameters {
-        Dockerfile = "Dockerfile",
-        Tags = new List<string> { Tags },
-        Remove = true
-      };
-      resp?.Dispose();
-      resp = await client.Images.BuildImageFromDockerfileAsync(ts, dockerparams);
-      using var reader = new StreamReader(resp);
-      string? line;
-      bool sucess = true;
-      while ((line = await reader.ReadLineAsync()) != null) {
-        sb.AppendLine(line);
-        if (line.Contains("\"error\"", StringComparison.OrdinalIgnoreCase)) {
-          sucess = false;
+      try {
+        using var ts = await TarMaker(path);
+        var CID = Guid.NewGuid().ToString("N");
+        string Tags = $"run-{CID}:latest";
+        var dockerparams = new ImageBuildParameters {
+          Dockerfile = "Dockerfile",
+          Tags = new List<string> { Tags },
+          Remove = true
+        };
+        resp?.Dispose();
+        resp = await client.Images.BuildImageFromDockerfileAsync(ts, dockerparams);
+        using var reader = new StreamReader(resp);
+        string? line;
+        while ((line = await reader.ReadLineAsync()) != null) {
+          sb.AppendLine(line);
+          if (line.Contains("\"error\"", StringComparison.OrdinalIgnoreCase)) {
+            sucess = false;
+          }
         }
+        if (!sucess) {
+          Console.WriteLine("Erro ao construir a imagem Docker");
+          return;
+        }
+        CID_ = Tags;
+      } catch (Exception e) {
+        await Console.Error.WriteLineAsync(e.Message);
       }
-      if (!sucess) {
-        throw new Exception("Erro ao construir a imagem Docker");
-      }
-      CID_ = Tags;
     }
     public async Task<string> Reader(CancellationToken cancellationToken = default) {
       if (attachStream == null) {
@@ -116,6 +140,7 @@ namespace DockerSystem {
       }
       try {
         var buffer = new byte[8192];
+        var errbuffer = new StringBuilder();
         while (!token.IsCancellationRequested) {
           var result = await attachStream.ReadOutputAsync(buffer, 0, buffer.Length, token);
           if (result.EOF) {
@@ -130,9 +155,24 @@ namespace DockerSystem {
           }
           var txt = Encoding.UTF8.GetString(buffer, 0, result.Count);
           sb.Append(txt);
+          errbuffer.Append(txt);
           response = await codeAnalyzer.Responsedata(txt);
           if (!string.IsNullOrEmpty(response)) {
             await Writer(response);
+          }
+          while (true) {
+            var text = errbuffer.ToString();
+            var index = text.IndexOf('\n');
+            if (index < 0) {
+              break;
+            }
+            var line = text[..index];
+            errbuffer.Remove(0, index + 1);
+            if (ContainsAny(line, ErrorKeywords)) {
+              errors++;
+            } else if (ContainsAny(line, WarningKeywords)) {
+              warnings++;
+            }
           }
         }
       } catch (OperationCanceledException) {
@@ -153,6 +193,14 @@ namespace DockerSystem {
         }
       } catch (OperationCanceledException) {
       }
+    }
+    private bool ContainsAny(string line, string[] keywords) {
+      foreach (var keyword in keywords) {
+        if (line.Contains(keyword, StringComparison.OrdinalIgnoreCase)) {
+          return true;
+        }
+      }
+      return false;
     }
     public async Task<string> RunContainer(CancellationToken token = default) {
       var container = await client.Containers.CreateContainerAsync(new CreateContainerParameters {
@@ -181,8 +229,13 @@ namespace DockerSystem {
       var complete = await Task.WhenAny(waittask, globaltimeout);
       if (complete == globaltimeout) {
         await ContainerKill(containerid);
+        timeout__ = true;
       }
       ct.Cancel();
+      var info = await client.Containers.InspectContainerAsync(containerid);
+      if (info.State.ExitCode != 0) {
+        errors++;
+      }
       await Task.WhenAll(Taskreader, Taskwatcher);
       return containerid;
     }

@@ -3,15 +3,18 @@ using Archives;
 using CodeAnalysis;
 using CompilationSystem;
 using DockerSystem;
+using DataBaseSystem;
 using dotenv.net;
 
 DotEnv.Load();
 string key = Environment.GetEnvironmentVariable("Gemini");
+string cs = Environment.GetEnvironmentVariable("DBConnection");
 
 ArchiveManager manager = new ArchiveManager();
 CodeAnalyzer codeAnalyzer;
 CompilationSystem_ compilation;
 DockerManager dockerManager;
+DBConnector dbConnector = new DBConnector(cs);
 
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
@@ -42,6 +45,7 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   await dockerManager.DockerFileMaker(HashOutput + "/" + manager.ID_Code + "/", compilation.TYPE);
   await dockerManager.DockerBuildImage(HashOutput + "/" + manager.ID_Code + "/");
   await dockerManager.RunContainer();
+  //dbConnector.Connect(Name, Team, HashOutput, dockerManager.codenumber, sum, compilation.approved);
   return Results.Ok(data);
 }).DisableAntiforgery().WithName("/");
 

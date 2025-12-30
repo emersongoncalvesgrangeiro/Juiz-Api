@@ -87,10 +87,16 @@ namespace DockerSystem {
     }
     public async Task<string> RunContainer() {
       var container = await client.Containers.CreateContainerAsync(new CreateContainerParameters {
-        Image = CID_
+        Image = CID_,
+        Tty = true,
+        AttachStderr = true,
+        AttachStdin = true,
+        AttachStdout = true,
+        StdinOnce = false
       });
       var containerid = container.ID;
       bool containerrunning = await client.Containers.StartContainerAsync(containerid, null);
+      var stream = await client.Containers.AttachContainerAsync(containerid, false, new ContainerAttachParameters { Stream = true, Stdin = true, Stdout = true, Stderr = true });
       if (!containerrunning) {
         throw new Exception("Erro ao iniciar container");
       }

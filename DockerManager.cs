@@ -225,15 +225,20 @@ namespace DockerSystem {
       var Taskreader = Task.Run(() => Readerl(ct.Token));
       var Taskwatcher = Task.Run(() => InputWatch(TimeSpan.FromMilliseconds(500), ct.Token));
       var waittask = client.Containers.WaitContainerAsync(containerid);
-      var globaltimeout = Task.Delay(TimeSpan.FromSeconds(15), token);
+      var globaltimeout = Task.Delay(TimeSpan.FromSeconds(30), token);
       var complete = await Task.WhenAny(waittask, globaltimeout);
       if (complete == globaltimeout) {
         await ContainerKill(containerid);
         timeout__ = true;
       }
       ct.Cancel();
-      var info = await client.Containers.InspectContainerAsync(containerid);
-      if (info.State.ExitCode != 0) {
+      try {
+        var info = await client.Containers.InspectContainerAsync(containerid);
+        if (info.State.ExitCode != 0) {
+          errors++;
+        }
+      } catch (DockerContainerNotFoundException) {
+        timeout__ = true;
         errors++;
       }
       await Task.WhenAll(Taskreader, Taskwatcher);

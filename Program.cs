@@ -24,7 +24,7 @@ var app = builder.Build();
 app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   compilation = new CompilationSystem_();
   codeAnalyzer = new CodeAnalyzer(key);
-  dockerManager = new DockerManager();
+  dockerManager = new DockerManager(key);
   var from = await request.ReadFormAsync();
   var data = new { Files = from.Files.Select(f => f.FileName).ToList() };
   var files = from.Files.ToList();
@@ -41,16 +41,16 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
     manager.DeleteDirectory(HashOutput);
   } else {
     await compilation.Checker(HashOutput + "/" + manager.ID_Code + "/");
-    Console.WriteLine("Erros: " + compilation.error);
-    Console.WriteLine("Output: " + compilation.warnings);
+    //    Console.WriteLine("Erros: " + compilation.error);
+    //    Console.WriteLine("Output: " + compilation.warnings);
   }
   await dockerManager.DockerFileMaker(HashOutput + "/" + manager.ID_Code + "/", compilation.TYPE);
   await dockerManager.DockerBuildImage(HashOutput + "/" + manager.ID_Code + "/");
-  string ID = await dockerManager.RunContainer(codeAnalyzer.Responsedata);
+  string ID = await dockerManager.RunContainer();
   Console.WriteLine("\n\t\tIA:" + "\n\t\tError:" + codeAnalyzer.errors + "\n\t\tWarnings:" + codeAnalyzer.warnings + "\n\t\tCompilarion:" + "\n\t\tError:" + compilation.error + "\n\t\toutput:" + compilation.warnings + "\n\t\tDocker:" + "\n\t\tError:" + dockerManager.output);
   // avaliator.Calculating(codeAnalyzer.errors, codeAnalyzer.warnings, compilation.error, compilation., dockerManager.errorrunning, dockerManager.warningsrunning);
   //dbConnector.Connect(Name, Team, HashOutput, dockerManager.codenumber, sum, compilation.approved);
-  await dockerManager.ContainerKill(ID);
+  //await dockerManager.ContainerKill(ID);
   return Results.Ok(data);
 }).DisableAntiforgery().WithName("/");
 

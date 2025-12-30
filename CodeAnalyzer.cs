@@ -29,10 +29,12 @@ namespace CodeAnalysis {
       warnings = warn.Success ? int.Parse(warn.Groups[1].Value) : 0;
     }
     public async Task<string> Responsedata(string data) {
-      string instructions =
-        $"Responda de forma clara e objetiva ao que se pede no augorítimo se atendo apenas ao que é pedido: {data}";
+      Console.WriteLine("Data: " + data);
+      string instructions = $"Responda de forma clara e objetiva ao que se pede no augorítimo se atendo apenas ao que é pedido: {data}";
       var response = await client.Models.GenerateContentAsync(model: "gemini-3-pro-preview", contents: instructions);
-      return response.Candidates[0].Content.Parts[0].Text;
+      string finalresponse = response.Candidates[0].Content.Parts[0].Text;
+      Console.WriteLine(finalresponse);
+      return finalresponse;
     }
   }
 }

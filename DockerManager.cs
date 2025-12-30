@@ -3,21 +3,26 @@ using Docker.DotNet;
 using Docker.DotNet.Models;
 using System.Text;
 using CodeAnalysis;
+using System.ComponentModel;
 
 namespace DockerSystem {
   public class DockerManager {
-    public delegate Task<string> outputdelegate(string output);
     private DockerClient client;
     private Stream? resp;
     private MultiplexedStream? attachStream;
     private string CID_;
     public string output;
     public StringBuilder sb;
-    public DockerManager() {
+    private CodeAnalyzer codeAnalyzer;
+    private DateTime lastoutput;
+    private string response = "";
+    private bool sendresponse = false;
+    public DockerManager(string key) {
       client = new DockerClientConfiguration(new Uri("unix:///var/run/docker.sock")).CreateClient();
       CID_ = "";
       output = "";
       sb = new StringBuilder();
+      codeAnalyzer = new CodeAnalyzer(key);
     }
     public async Task DockerFileMaker(string path, string type) {
       string DockerFilec =
@@ -105,56 +110,80 @@ namespace DockerSystem {
       memorystream.Seek(0, SeekOrigin.Begin);
       return memorystream;
     }
-    private async Task Readerl(outputdelegate output, CancellationToken token) {
+    private async Task Readerl(CancellationToken token) {
       if (attachStream == null) {
         throw new InvalidOperationException("Container não anexado");
       }
-      var buffer = new byte[8192];
-      while (!token.IsCancellationRequested) {
-        var result = await attachStream.ReadOutputAsync(buffer, 0, buffer.Length, token);
-        if (result.EOF) {
-          break;
+      try {
+        var buffer = new byte[8192];
+        while (!token.IsCancellationRequested) {
+          var result = await attachStream.ReadOutputAsync(buffer, 0, buffer.Length, token);
+          if (result.EOF) {
+            break;
+          }
+          if (result.Count == 0) {
+            continue;
+          }
+          lastoutput = DateTime.UtcNow;
+          if (result.Target != MultiplexedStream.TargetStream.StandardOut) {
+            continue;
+          }
+          var txt = Encoding.UTF8.GetString(buffer, 0, result.Count);
+          sb.Append(txt);
+          response = await codeAnalyzer.Responsedata(txt);
+          if (!string.IsNullOrEmpty(response)) {
+            await Writer(response);
+          }
         }
-        if (result.Count == 0) {
-          continue;
-        }
-        if (result.Target != MultiplexedStream.TargetStream.StandardOut) {
-          continue;
-        }
-        var txt = Encoding.UTF8.GetString(buffer, 0, result.Count);
-        sb.Append(txt);
-        var response = await output(txt);
-        if (!string.IsNullOrEmpty(response)) {
-          await Writer(response);
-        }
+      } catch (OperationCanceledException) {
+      } catch (ObjectDisposedException) {
       }
     }
-    public async Task<string> RunContainer(outputdelegate response, CancellationToken token = default) {
+    private async Task InputWatch(TimeSpan idletime, CancellationToken token) {
+      try {
+        while (!token.IsCancellationRequested) {
+          if (!sendresponse && DateTime.UtcNow - lastoutput > idletime) {
+            var response_ = await codeAnalyzer.Responsedata(response);
+            if (!string.IsNullOrEmpty(response_)) {
+              await Writer(response_);
+              sendresponse = true;
+            }
+          }
+          await Task.Delay(50, token);
+        }
+      } catch (OperationCanceledException) {
+      }
+    }
+    public async Task<string> RunContainer(CancellationToken token = default) {
       var container = await client.Containers.CreateContainerAsync(new CreateContainerParameters {
         Image = CID_,
-        Tty = false,
+        AttachStdout = true,
         AttachStderr = true,
         AttachStdin = true,
-        AttachStdout = true,
         OpenStdin = true,
+        StdinOnce = false,
+        Tty = false
       });
       var containerid = container.ID;
-      bool containerrunning = await client.Containers.StartContainerAsync(containerid, null);
+      lastoutput = DateTime.UtcNow;
+      await client.Containers.StartContainerAsync(containerid, null);
       attachStream = await client.Containers.AttachContainerAsync(containerid, false, new ContainerAttachParameters {
         Stream = true,
         Stderr = true,
         Stdout = true,
         Stdin = true
       });
-      if (!containerrunning) {
-        throw new Exception("Erro ao iniciar container");
+      var ct = CancellationTokenSource.CreateLinkedTokenSource(token);
+      var Taskreader = Task.Run(() => Readerl(ct.Token));
+      var Taskwatcher = Task.Run(() => InputWatch(TimeSpan.FromMilliseconds(500), ct.Token));
+      var waittask = client.Containers.WaitContainerAsync(containerid);
+      var globaltimeout = Task.Delay(TimeSpan.FromSeconds(15), token);
+      var complete = await Task.WhenAny(waittask, globaltimeout);
+      if (complete == globaltimeout) {
+        await ContainerKill(containerid);
       }
-      await client.Containers.WaitContainerAsync(containerid);
-      using var ct = CancellationTokenSource.CreateLinkedTokenSource(token);
-      var Taskreader = Readerl(response, ct.Token);
-      await client.Containers.WaitContainerAsync(containerid);
-      await ct.CancelAsync();
-      await Taskreader;
+      ct.Cancel();
+      await Task.WhenAll(Taskreader, Taskwatcher);
       return containerid;
     }
     public async Task ContainerKill(string ID) {

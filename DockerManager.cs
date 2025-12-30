@@ -2,16 +2,22 @@ using ICSharpCode.SharpZipLib.Tar;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using System.Text;
-using System.IO;
-using System.ComponentModel;
+using CodeAnalysis;
 
 namespace DockerSystem {
   public class DockerManager {
+    public delegate Task<string> outputdelegate(string output);
     private DockerClient client;
-    private Stream resp;
+    private Stream? resp;
+    private MultiplexedStream? attachStream;
     private string CID_;
+    public string output;
+    public StringBuilder sb;
     public DockerManager() {
       client = new DockerClientConfiguration(new Uri("unix:///var/run/docker.sock")).CreateClient();
+      CID_ = "";
+      output = "";
+      sb = new StringBuilder();
     }
     public async Task DockerFileMaker(string path, string type) {
       string DockerFilec =
@@ -36,10 +42,9 @@ namespace DockerSystem {
       }
     }
     public async Task DockerBuildImage(string path) {
-      string Tags = "";
       using var ts = await TarMaker(path);
       var CID = Guid.NewGuid().ToString("N");
-      Tags = $"run-{CID}:latest";
+      string Tags = $"run-{CID}:latest";
       var dockerparams = new ImageBuildParameters {
         Dockerfile = "Dockerfile",
         Tags = new List<string> { Tags },
@@ -49,25 +54,40 @@ namespace DockerSystem {
       resp = await client.Images.BuildImageFromDockerfileAsync(ts, dockerparams);
       using var reader = new StreamReader(resp);
       string? line;
-      bool success = true;
+      bool sucess = true;
       while ((line = await reader.ReadLineAsync()) != null) {
-        Console.WriteLine(line);
-        if (line.Contains("error", StringComparison.OrdinalIgnoreCase)) {
-          success = false;
+        sb.AppendLine(line);
+        if (line.Contains("\"error\"", StringComparison.OrdinalIgnoreCase)) {
+          sucess = false;
         }
       }
-      if (success) {
-        CID_ = Tags;
-      } else {
-        throw new Exception("Error");
+      if (!sucess) {
+        throw new Exception("Erro ao construir a imagem Docker");
       }
+      CID_ = Tags;
     }
-    /* public async Task Reader() {
-       using var reader = new StreamReader(resp);
-       while (!reader.EndOfStream) {
-         Console.WriteLine(await reader.ReadLineAsync());
-       }
-     }*/
+    public async Task<string> Reader(CancellationToken cancellationToken = default) {
+      if (attachStream == null) {
+        throw new InvalidOperationException("Container não anexado");
+      }
+      var buffer = new byte[8192];
+      while (!cancellationToken.IsCancellationRequested) {
+        var result = await attachStream.ReadOutputAsync(buffer, 0, buffer.Length, cancellationToken);
+        if (result.EOF || result.Count == 0) {
+          break;
+        }
+        var outputChunk = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        sb.Append(outputChunk);
+      }
+      return sb.ToString();
+    }
+    public async Task Writer(string message) {
+      if (attachStream == null) {
+        throw new InvalidOperationException("Container não anexado");
+      }
+      var bytes = Encoding.UTF8.GetBytes(message + "\n");
+      await attachStream.WriteAsync(bytes, 0, bytes.Length, CancellationToken.None);
+    }
     private async Task<Stream> TarMaker(string directory) {
       var memorystream = new MemoryStream();
       var tarout = new TarOutputStream(memorystream, Encoding.UTF8);
@@ -85,32 +105,62 @@ namespace DockerSystem {
       memorystream.Seek(0, SeekOrigin.Begin);
       return memorystream;
     }
-    public async Task<string> RunContainer() {
+    private async Task Readerl(outputdelegate output, CancellationToken token) {
+      if (attachStream == null) {
+        throw new InvalidOperationException("Container não anexado");
+      }
+      var buffer = new byte[8192];
+      while (!token.IsCancellationRequested) {
+        var result = await attachStream.ReadOutputAsync(buffer, 0, buffer.Length, token);
+        if (result.EOF) {
+          break;
+        }
+        if (result.Count == 0) {
+          continue;
+        }
+        if (result.Target != MultiplexedStream.TargetStream.StandardOut) {
+          continue;
+        }
+        var txt = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        sb.Append(txt);
+        var response = await output(txt);
+        if (!string.IsNullOrEmpty(response)) {
+          await Writer(response);
+        }
+      }
+    }
+    public async Task<string> RunContainer(outputdelegate response, CancellationToken token = default) {
       var container = await client.Containers.CreateContainerAsync(new CreateContainerParameters {
         Image = CID_,
-        Tty = true,
+        Tty = false,
         AttachStderr = true,
         AttachStdin = true,
         AttachStdout = true,
-        StdinOnce = false
+        OpenStdin = true,
       });
       var containerid = container.ID;
       bool containerrunning = await client.Containers.StartContainerAsync(containerid, null);
-      var stream = await client.Containers.AttachContainerAsync(containerid, false, new ContainerAttachParameters { Stream = true, Stdin = true, Stdout = true, Stderr = true });
+      attachStream = await client.Containers.AttachContainerAsync(containerid, false, new ContainerAttachParameters {
+        Stream = true,
+        Stderr = true,
+        Stdout = true,
+        Stdin = true
+      });
       if (!containerrunning) {
         throw new Exception("Erro ao iniciar container");
       }
       await client.Containers.WaitContainerAsync(containerid);
-      await ContainerKill(containerid);
+      using var ct = CancellationTokenSource.CreateLinkedTokenSource(token);
+      var Taskreader = Readerl(response, ct.Token);
+      await client.Containers.WaitContainerAsync(containerid);
+      await ct.CancelAsync();
+      await Taskreader;
       return containerid;
     }
     public async Task ContainerKill(string ID) {
       await client.Containers.StopContainerAsync(ID, new ContainerStopParameters { WaitBeforeKillSeconds = 0 });
       await client.Containers.RemoveContainerAsync(ID, new ContainerRemoveParameters { Force = true });
       await client.Images.DeleteImageAsync(CID_, new ImageDeleteParameters { Force = true });
-    }
-    public async Task<string> LogReader() {
-      return "";
     }
   }
 }

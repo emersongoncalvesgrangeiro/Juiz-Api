@@ -41,7 +41,7 @@ app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   HashMaker hash = new HashMaker(Name, Team);
   string HashOutput = hash.Output;
   if (OldHashs.Contains(HashOutput)) {
-    return Results.Ok(data);
+    return Results.Ok("O Envio dos códigos já foi realizado anteriormente.");
   }
   CodeAnalyzer codeAnalyzer = new CodeAnalyzer(key);
   CompilationSystem_ compilation = new CompilationSystem_();

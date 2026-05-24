@@ -4,10 +4,7 @@ namespace AvaliatorSystem {
       int score = 1000;
       int errors = 250;
       int warnings = 150;
-      //int finalsum = 0;
-      //bool approved = false;
       if (errorscompilation > 0) {
-        //approved = false;
         return new KeyValuePair<bool, int>(false, 0);
       }
       int totalwarings = warningscompilation + warningsrunning;
@@ -18,38 +15,6 @@ namespace AvaliatorSystem {
       }
       int finalscore = score - penality;
       return new KeyValuePair<bool, int>(true, finalscore);
-      /*
-      if (warningscompilation == warningsIA) {
-        int sum = warningscompilation + warningsIA + warningsrunning;
-        for (int i = 0; i < sum; i++) {
-          warnings += 150;
-        }
-      } else {
-        int sum = warningscompilation + warningsrunning;
-        for (int i = 0; i < sum; i++) {
-          warnings += 150;
-        }
-      }
-      if (errorrunning == errorsIA) {
-        int sum = errorsIA + errorrunning;
-        for (int i = 0; i < sum; i++) {
-          errors += 250;
-        }
-      } else {
-        for (int i = 0; i < errorrunning; i++) {
-          errors += 250;
-        }
-      }
-      finalsum = errors + warnings;
-
-      if (finalsum >= score) {
-        approved = false;
-        return new KeyValuePair<bool, int>(approved, 0);
-      } else {
-        approved = true;
-        int finalscore = score - finalsum;
-        return new KeyValuePair<bool, int>(approved, finalscore);
-      }*/
     }
   }
 }

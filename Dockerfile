@@ -7,16 +7,12 @@ RUN apt-get update -y && \
     rm packages-microsoft-prod.deb
 
 RUN apt-get update -y && \
-    apt-get install -y dotnet-sdk-8.0
-
-RUN apt-get install -y openjdk-21-jdk build-essential libcap2-bin
+    apt-get install -y dotnet-sdk-8.0 openjdk-21-jdk build-essential libcap2-bin
 
 WORKDIR /app
 COPY . .
 
 RUN dotnet publish -c Release -o OUT
-
-RUN setcap 'cap_net_bind_service=+ep' /usr/lib/dotnet/dotnet
 
 EXPOSE 3636
 ENTRYPOINT [ "dotnet", "OUT/Juiz.dll" ]

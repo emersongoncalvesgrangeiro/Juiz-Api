@@ -30,6 +30,8 @@ var app = builder.Build();
 HashSet<string> OldHashs = new HashSet<string>();
 var managerrepo = new ConcurrentDictionary<string, ArchiveManager>();
 
+app.MapGet("/health", () => "Healthy");
+
 app.MapPost("/", async (HttpRequest request, string Name, string Team) => {
   var from_ = await request.ReadFormAsync();
   var files = from_.Files.ToList();

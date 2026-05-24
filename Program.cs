@@ -16,12 +16,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => {
   options.Limits.MinRequestBodyDataRate = null;
   options.Limits.MaxRequestBodySize = null;
+  options.ListenAnyIP(3636);
 });
-/*builder.WebHost.ConfigureKestrel(options => {
-  options.Limits.MaxRequestBodySize = 150994944;
-  options.Limits.MinRequestBodyDataRate = null;
-  options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
-});*/
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options => {
   options.MultipartBodyLengthLimit = 150994944;
   options.ValueLengthLimit = int.MaxValue;

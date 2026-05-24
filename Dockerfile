@@ -1,11 +1,15 @@
 FROM ubuntu:latest AS build
 
-RUN apt-get update -y
-RUN apt-get update -y
-RUN apt-get install dotnet-sdk-8.0 -y
-RUN apt-get install openjdk-21-jdk -y
-RUN apt-get install build-essential -y
-RUN apt-get install libcap2-bin -y
+RUN apt-get update -y && \
+    apt-get install -y wget && \
+    wget https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
+    dpkg -i packages-microsoft-prod.deb && \
+    rm packages-microsoft-prod.deb
+
+RUN apt-get update -y && \
+    apt-get install -y dotnet-sdk-8.0
+
+RUN apt-get install -y openjdk-21-jdk build-essential libcap2-bin
 
 WORKDIR /app
 
@@ -15,8 +19,6 @@ RUN dotnet publish -c Release -o OUT
 
 RUN setcap 'cap_net_bind_service=+ep' /usr/lib/dotnet/dotnet
 
-#FROM docker:rc-dind-rootless
-
 EXPOSE 3636
 
-ENTRYPOINT [ "dotnet", "OUT/Juiz-API.dll" ]
+ENTRYPOINT [ "dotnet", "OUT/Juiz.dll" ]  # Ajuste o nome do .dll se necessário (seu .csproj tem nome "Juiz.csproj")
